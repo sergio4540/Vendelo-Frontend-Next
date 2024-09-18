@@ -1,101 +1,215 @@
-import Image from "next/image";
+"use client"; // This is a client component
+import { useState, useEffect } from 'react';
+import axiosInstance from '../app/utils/axios';
+import { useForm, SubmitHandler } from 'react-hook-form';
+import { Button, TextField, Typography, Container, Card, CardContent, CardActions } from '@mui/material';
+import { Alert } from '@mui/material';
 
-export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+interface Producto {
+  id?: number;
+  nombre: string;
+  descripcion: string;
+  precio: number;
 }
+
+const ProductsPage = () => {
+  const [productos, setProductos] = useState<Producto[]>([]);
+  const [editingProduct, setEditingProduct] = useState<Producto | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const { register, handleSubmit, reset } = useForm<Producto>();
+
+  // Efecto para eliminar mensajes después de 2 segundos
+  useEffect(() => {
+    if (errorMessage) {
+      const timer = setTimeout(() => {
+        setErrorMessage(null);
+      }, 2000); // 2 segundos
+
+      return () => clearTimeout(timer);
+    }
+  }, [errorMessage]);
+
+  useEffect(() => {
+    if (successMessage) {
+      const timer = setTimeout(() => {
+        setSuccessMessage(null);
+      }, 2000); // 2 segundos
+
+      return () => clearTimeout(timer);
+    }
+  }, [successMessage]);
+
+  useEffect(() => {
+    fetchProductos();
+  }, []);
+
+  const fetchProductos = async () => {
+    try {
+      const response = await axiosInstance.get('/productos');
+      setProductos(response.data);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+    }
+  };
+
+  const onCreate: SubmitHandler<Producto> = async (data) => {
+    try {
+      if (editingProduct) {
+        await axiosInstance.put(`/productos/${editingProduct.id}`, data);
+        setSuccessMessage('Producto actualizado exitosamente.');
+      } else {
+        await axiosInstance.post('/productos', data);
+        setSuccessMessage('Producto guardado exitosamente.');
+      }
+      
+      fetchProductos(); // Actualiza la lista de productos
+      reset(); // Limpia el formulario
+      setEditingProduct(null); // Resetea el estado de edición
+      setErrorMessage(null); // Limpia mensajes de error
+    } catch (error) {
+      console.error('Error creating/updating product:', error);
+      setErrorMessage('Ocurrió un error al guardar el producto.');
+      setSuccessMessage(null);
+    }
+  };
+  
+  
+
+  const onEdit = (product: Producto) => {
+    setEditingProduct(product);
+    reset(product);
+  };
+
+  const onDelete = async (id: number) => {
+    try {
+      await axiosInstance.delete(`/productos/${id}`);
+      fetchProductos();
+      reset(); // Limpiar el formulario aquí
+      setSuccessMessage('Producto eliminado exitosamente.');
+      setErrorMessage(null);
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      setErrorMessage('Ocurrió un error al eliminar el producto.');
+      setSuccessMessage(null);
+    }
+  };
+  
+
+  return (
+    
+      <><div>
+      {errorMessage && <Alert severity="error">{errorMessage}</Alert>}
+      {successMessage && <Alert severity="success">{successMessage}</Alert>}
+      
+    </div>
+    
+    <Container sx={{ marginTop: 4 }}>
+        <Typography variant="h4" gutterBottom>
+          Productos
+        </Typography>
+        <form onSubmit={handleSubmit(onCreate)}>
+          <TextField
+            {...register('nombre', { required: 'Nombre es obligatorio' })}
+            label="Nombre"
+            variant="outlined"
+            fullWidth
+            margin="normal"
+            sx={{
+              '& .MuiInputBase-input': {
+                color: 'white',
+              },
+              '& .MuiFormLabel-root': {
+                color: 'black',
+              },
+              '& .MuiOutlinedInput-root': {
+                '& fieldset': {
+                  borderColor: 'white',
+                },
+                '&:hover fieldset': {
+                  borderColor: 'primary',
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: 'primary',
+                },
+              }
+            }} />
+          <TextField
+            {...register('descripcion', { required: 'Descripción es obligatoria' })}
+            label="Descripción"
+            variant="outlined"
+            fullWidth
+            margin="normal"
+            multiline
+            sx={{
+              '& .MuiInputBase-input': {
+                color: 'white',
+              },
+              '& .MuiFormLabel-root': {
+                color: 'black',
+              },
+              '& .MuiOutlinedInput-root': {
+                '& fieldset': {
+                  borderColor: 'white',
+                },
+                '&:hover fieldset': {
+                  borderColor: 'primary',
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: 'primary',
+                },
+              }
+            }} />
+          <TextField
+            type="number"
+            {...register('precio', { required: 'Precio es obligatorio' })}
+            label="Precio"
+            variant="outlined"
+            fullWidth
+            margin="normal"
+            sx={{
+              '& .MuiInputBase-input': {
+                color: 'white',
+              },
+              '& .MuiFormLabel-root': {
+                color: 'black',
+              },
+              '& .MuiOutlinedInput-root': {
+                '& fieldset': {
+                  borderColor: 'white',
+                },
+                '&:hover fieldset': {
+                  borderColor: 'primary',
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: 'primary',
+                },
+              }
+            }} />
+          <Button type="submit" variant="contained" color="primary" sx={{ marginBottom: 4 }}>
+            {editingProduct ? 'Actualizar Producto' : 'Crear Producto'}
+          </Button>
+        </form>
+        {productos.map(product => (
+          <Card key={product.id} variant="outlined" sx={{ marginBottom: 2 }}>
+            <CardContent>
+              <Typography variant="h6">{product.nombre}</Typography>
+              <Typography variant="body2">{product.descripcion}</Typography>
+              <Typography variant="body2">Precio: ${product.precio}</Typography>
+            </CardContent>
+            <CardActions>
+              <Button onClick={() => onEdit(product)} color="primary">
+                Editar
+              </Button>
+              <Button onClick={() => onDelete(product.id!)} color="secondary">
+                Eliminar
+              </Button>
+            </CardActions>
+          </Card>
+        ))}
+      </Container></>
+  );
+};
+
+export default ProductsPage;
+
